@@ -59,6 +59,8 @@ createPlayer name = Player name (map (setCardName name) (buildDeck 51)) [] [] []
     buildDeck d = buildDeck (d-1) ++ [Card (div d 13) (mod d 13 + 1) ""]
 
 
+initNertz :: Player -> Player  
+initNertz p = p
 
 playerNames = ["Alf", "Bob", "Cat", "Dog"]
 
