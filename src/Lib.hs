@@ -33,6 +33,7 @@ removeTopCard :: Stack -> Stack
 removeTopCard = tail
 
 -- Player Object & methods
+data PlayerDeck = PlayerDeck Name Deck
 data Player = Player Name Deck Stack Stack [Stack] deriving (Show)
 
 playerName :: Player -> Name
@@ -58,6 +59,8 @@ createPlayer name = Player name (map (setCardName name) (buildDeck 51)) [] [] []
     buildDeck 0 = [Card 0 1 ""]
     buildDeck d = buildDeck (d-1) ++ [Card (div d 13) (mod d 13 + 1) ""]
 
+transferCard :: (Stack, Stack) -> (Stack, Stack)
+transferCard (stackFrom, stackTo) = (tail stackFrom, head stackFrom:stackTo)
 
 initNertz :: Player -> Player  
 initNertz p = p
