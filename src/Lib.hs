@@ -33,16 +33,38 @@ removeTopCard :: Stack -> Stack
 removeTopCard = tail
 
 -- Player Object & methods
-data PlayerInfo = PlayerInfo Name Int deriving (Show)
+data PlayerInfo = PlayerInfo Name Int Int deriving (Show)
 data PlayerCards = PlayerCards Deck Stack Stack Stack Stack Stack Stack deriving (Show)
-data Player = Player PlayerInfo PlayerCards deriving (Show)
+data Player = Player PlayerInfo PlayerCards Action deriving (Show)
+
+data Action =   Wait |
+                DrawThree |
+                NertzToMid Stack |
+                NertzToSoli Int |
+                HandToMid Stack |
+                HandToSoli Int |
+                SoliToSoli Int Int |
+                SoliToMid Int Stack deriving (Show)
+
+--data PlayerAction = PlayerAction Action
+
+
+data Table = Table [Player] [Stack] deriving (Show)
+
+tablePlayers :: Table -> [Player]
+tableStacks :: Table -> [Stack]
+
+tablePlayers (Table players _) = players
+tableStacks (Table _ stacks) = stacks
 
 playerCards :: Player -> PlayerCards
 playerInfo :: Player -> PlayerInfo
+playerAction :: Player -> Action
 
 playerName :: PlayerInfo -> Name
 playerDeck :: PlayerCards -> Deck
 playerCutVal :: PlayerInfo -> Int
+playerScore :: PlayerInfo -> Int
 playerNertz :: PlayerCards -> Stack
 playerHand :: PlayerCards -> Stack
 playerSoli1 :: PlayerCards -> Stack
@@ -52,28 +74,32 @@ playerSoli4 :: PlayerCards -> Stack
 --updateDeck :: Player -> Deck -> Player
 createPlayer :: (Name, Int) -> Player
 
-playerName (PlayerInfo name _ ) = name
-playerCutVal (PlayerInfo _ cutVal) = cutVal
-playerDeck (PlayerCards deck _ _ _ _ _ _) = deck
+playerName   (PlayerInfo name _ _) = name
+playerCutVal (PlayerInfo _ cutVal _) = cutVal
+playerScore (PlayerInfo _ _ score) = score
+playerDeck  (PlayerCards deck _ _ _ _ _ _) = deck
 playerNertz (PlayerCards _ nertzStack _ _ _ _ _) = nertzStack
-playerHand (PlayerCards _ _ handStack _ _ _ _) = handStack
+playerHand  (PlayerCards _ _ handStack _ _ _ _) = handStack
 playerSoli1 (PlayerCards _ _ _ soli _ _ _) = soli
 playerSoli2 (PlayerCards _ _ _ _ soli _ _) = soli
 playerSoli3 (PlayerCards _ _ _ _ _ soli _) = soli
 playerSoli4 (PlayerCards _ _ _ _ _ _ soli) = soli
 
-playerInfo (Player info _) = info
-playerCards (Player _ cards) = cards
+playerInfo (Player info _ _) = info
+playerCards (Player _ cards _) = cards
+playerAction (Player _ _ action) = action
 
 --updateDeck player newDeck = Player (playerName player) (playerCutVal player) newDeck (playerNertz player) (playerHand player) (playerSoli player)
 
 
-createPlayer (name, cutVal) = Player pinfo pcards where --PlayerInfo(name cutVal) PlayerCards(map (setCardName name) (buildDeck 51) [] [] [] [] [] []) where
-    pinfo = PlayerInfo name cutVal
+createPlayer (name, cutVal) = Player pinfo pcards pact where --PlayerInfo(name cutVal) PlayerCards(map (setCardName name) (buildDeck 51) [] [] [] [] [] []) where
+    score = 0
+    pinfo = PlayerInfo name cutVal score
     pcards = PlayerCards (map (setCardName name) (buildDeck 51)) [] [] [] [] [] []
     setCardName name card = Card (cardSuit card) (cardValue card) name
     buildDeck 0 = [Card 0 1 ""]
-    buildDeck d = buildDeck (d-1) ++ [Card (div d 13) (mod d 13 + 1) ""]    
+    buildDeck d = buildDeck (d-1) ++ [Card (div d 13) (mod d 13 + 1) ""]
+    pact = Wait    
 --Player name cutVal (map (setCardName name) (buildDeck 51)) [] [] [] where
 
 
@@ -104,7 +130,8 @@ setupPlayerStacks :: Player -> Player
 setupPlayerStacks player = player' where
     pinfo = playerInfo player
     pcards = playerCards player
-    deck' = shuffleNTimes 223 (playerCutVal pinfo) (playerDeck pcards)
+    pact = playerAction player
+    deck' = shuffleNTimes 233 (playerCutVal pinfo) (playerDeck pcards)
     nertz' = takeCards (0,12) deck'
     soli1' = takeCards (13,13) deck'
     soli2' = takeCards (14,14) deck'
@@ -112,7 +139,7 @@ setupPlayerStacks player = player' where
     soli4' = takeCards (16,16) deck'
     hand' = takeCards (17,51) deck'
     pcards' = PlayerCards deck' nertz' hand' soli1' soli2' soli3' soli4'
-    player' = Player pinfo pcards'
+    player' = Player pinfo pcards' pact
 
 playerNames = ["Alf", "Bob", "Cat", "Dog"]
 playerCutVals = [10, 20, 30, 40]
@@ -121,6 +148,7 @@ playerInfos = zip playerNames playerCutVals
 
 players = map (setupPlayerStacks . createPlayer) playerInfos
 
+table = Table players []
 
 jonah = (setupPlayerStacks . createPlayer) ("jonah", 17)
 jd = playerDeck $ playerCards jonah 
