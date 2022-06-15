@@ -17,11 +17,11 @@ type Stack = [Card]
 data Card = Card Suit Value Name deriving (Show)
 
 cardSuit :: Card -> Suit
-cardValue :: Card -> Value
+cardVal :: Card -> Value
 cardName :: Card -> Name
 
 cardSuit (Card suit value name) = suit
-cardValue (Card suit value name) = value
+cardVal (Card suit value name) = value
 cardName (Card suit value name) = name
 
 
@@ -37,8 +37,10 @@ data PlayerInfo = PlayerInfo Name Int Int deriving (Show)
 data PlayerCards = PlayerCards Deck Stack Stack Stack Stack Stack Stack deriving (Show)
 data Player = Player PlayerInfo PlayerCards Action deriving (Show)
 
-data Action =   Wait |
+data Action =   Idle |
+                Wait |
                 DrawThree |
+                AceToMid |
                 NertzToMid Stack |
                 NertzToSoli Int |
                 HandToMid Stack |
@@ -96,11 +98,15 @@ createPlayer (name, cutVal) = Player pinfo pcards pact where --PlayerInfo(name c
     score = 0
     pinfo = PlayerInfo name cutVal score
     pcards = PlayerCards (map (setCardName name) (buildDeck 51)) [] [] [] [] [] []
-    setCardName name card = Card (cardSuit card) (cardValue card) name
+    setCardName name card = Card (cardSuit card) (cardVal card) name
     buildDeck 0 = [Card 0 1 ""]
     buildDeck d = buildDeck (d-1) ++ [Card (div d 13) (mod d 13 + 1) ""]
     pact = Wait    
 --Player name cutVal (map (setCardName name) (buildDeck 51)) [] [] [] where
+
+
+playerTopCards :: PlayerCards -> [Card]
+playerTopCards player = map head $ [playerNertz player] ++ [playerHand player] ++ [playerSoli1 player] ++ [playerSoli2 player] ++ [playerSoli3 player] ++ [playerSoli4 player]
 
 
 transferCard :: (Stack, Stack) -> (Stack, Stack)
@@ -141,6 +147,51 @@ setupPlayerStacks player = player' where
     pcards' = PlayerCards deck' nertz' hand' soli1' soli2' soli3' soli4'
     player' = Player pinfo pcards' pact
 
+
+
+getPlayerActions :: Table -> Table
+getPlayerActions table = table' where
+    players = tablePlayers table
+    midStacks = tableStacks table
+    players' = foldr (\ player -> (++) [getPlayerAction player]) [] players
+    table' = Table players' midStacks
+
+getPlayerAction :: Player -> Player
+getPlayerAction player = player' where
+    pinfo = playerInfo player
+    pcards = playerCards player
+    topCards = map head $ [playerNertz pcards] ++ [playerHand pcards] ++ [playerSoli1 pcards] ++ [playerSoli2 pcards] ++ [playerSoli3 pcards] ++ [playerSoli4 pcards]
+    canAceToMid = foldr (((||) . (==1)) . cardVal) False topCards
+    
+    pact' :: Action
+    pact' = if canAceToMid 
+        then AceToMid
+    else Wait
+    player' = Player pinfo pcards pact'
+{-
+    pcards = playerCards player
+    action = playerAction player
+    nertz = playerNertz pcards
+    hand = playerHand pcards
+    soli1 = playerSoli1 pcards
+    soli2 = playerSoli2 pcards
+    soli3 = playerSoli3 pcards
+    soli4 = playerSoli4 pcards
+    action' = action
+-}
+--canNertzToMid :: Stack -> Bool
+
+canStackOnMidStacks :: [Stack] -> Card -> Bool
+canStackOnMidStacks midStacks card = foldr (&&) True $ map (canStackOnMid card) midStacks
+
+
+canStackOnMid :: Card -> Stack -> Bool
+canStackOnMid card stack = canStack where
+    canStack = isAce || cardSuit card == cardSuit topCard && cardVal card == (cardVal topCard + 1)
+    isAce = cardVal card == 1
+    topCard = head stack
+
+
 playerNames = ["Alf", "Bob", "Cat", "Dog"]
 playerCutVals = [10, 20, 30, 40]
 playerInfos = zip playerNames playerCutVals
@@ -154,3 +205,11 @@ jonah = (setupPlayerStacks . createPlayer) ("jonah", 17)
 jd = playerDeck $ playerCards jonah 
 jn = playerCutVal $ playerInfo jonah
 
+doSomething :: [Card] -> [Int]
+doSomething (card:cards) = [cardVal card] ++ doSomething cards
+doSomething [] = []
+
+
+cardVals :: [[Card]] -> [[Value]]
+cardVals (c:cs) = [map cardVal c] ++ cardVals cs
+cardVals [] = []
