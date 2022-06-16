@@ -24,6 +24,14 @@ cardSuit (Card suit value name) = suit
 cardVal (Card suit value name) = value
 cardName (Card suit value name) = name
 
+oppositeSuits :: Card -> Card -> Bool
+oppositeSuits card1 card2 = mod (cardSuit card1) 2 /= mod (cardSuit card2) 2
+
+canStackSoli :: Card -> Card -> Bool
+canStackSoli card1 card2 = oppositeSuits card1 card2 && cardVal card1 == cardVal card2 - 1
+
+canStackMid :: Card -> Card -> Bool
+canStackMid card1 card2 = cardSuit card1 == cardSuit card2 && cardVal card1 == cardVal card2 + 1
 
 -- Stack methods
 takeTopCard :: Stack -> Card
@@ -153,21 +161,40 @@ getPlayerActions :: Table -> Table
 getPlayerActions table = table' where
     players = tablePlayers table
     midStacks = tableStacks table
-    players' = foldr (\ player -> (++) [getPlayerAction player]) [] players
+    players' = foldr (\ player -> (++) [getPlayerAction player midStacks]) [] players
     table' = Table players' midStacks
 
-getPlayerAction :: Player -> Player
-getPlayerAction player = player' where
+getPlayerAction :: Player -> [Stack] -> Player
+getPlayerAction player midStacks = player' where
     pinfo = playerInfo player
     pcards = playerCards player
-    topCards = map head $ [playerNertz pcards] ++ [playerHand pcards] ++ [playerSoli1 pcards] ++ [playerSoli2 pcards] ++ [playerSoli3 pcards] ++ [playerSoli4 pcards]
+
+    topNertz = head $ playerNertz pcards
+    topSolis = map head $ [playerSoli1 pcards] ++ [playerSoli2 pcards] ++ [playerSoli3 pcards] ++ [playerSoli4 pcards]
+    topHand = head $ playerHand pcards
+    topMids = map head midStacks
+    topCards = [topNertz] ++ [topHand] ++ topSolis
+
     canAceToMid = foldr (((||) . (==1)) . cardVal) False topCards
-    
+    canNertzToMid = foldr (||) False $ map (canStackMid topNertz) topMids
+    canNertzToSoli = foldr (||) False $ map (canStackSoli topNertz) topSolis
+    canHandToMid = foldr (||) False $ map (canStackMid topHand) topMids
+    canSoliToMid = foldr (||) False $ getPerms topSolis topMids canStackMid
+    --canSoliToSoli
+
+
     pact' :: Action
-    pact' = if canAceToMid 
-        then AceToMid
-    else Wait
+    pact'
+        | canAceToMid = AceToMid
+        | canNertzToMid = NertzToMid []
+        | canNertzToSoli = NertzToSoli 0
+        | canHandToMid = HandToMid []
+        | canSoliToMid = SoliToMid 0 []
+        | otherwise = DrawThree
+
     player' = Player pinfo pcards pact'
+
+
 {-
     pcards = playerCards player
     action = playerAction player
@@ -200,6 +227,8 @@ playerInfos = zip playerNames playerCutVals
 players = map (setupPlayerStacks . createPlayer) playerInfos
 
 table = Table players []
+table' = getPlayerActions table
+players' = tablePlayers table'
 
 jonah = (setupPlayerStacks . createPlayer) ("jonah", 17)
 jd = playerDeck $ playerCards jonah 
@@ -213,3 +242,20 @@ doSomething [] = []
 cardVals :: [[Card]] -> [[Value]]
 cardVals (c:cs) = [map cardVal c] ++ cardVals cs
 cardVals [] = []
+
+
+bill = createPlayer ("Bill",1)
+bd = playerDeck $ playerCards bill
+
+oneHeart = bd !! 0
+twoHeart = bd !! 1
+threeHeart = bd !! 2
+
+
+addEach i j = i + j
+
+t1 = [1,2,3]
+t2 = [4,5,6]
+
+
+getPerms xs ys f = foldr (\ x -> (++) (map (f x) ys)) [] xs
