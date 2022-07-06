@@ -45,6 +45,7 @@ data PlayerInfo = PlayerInfo Name Int Int deriving (Show)
 data PlayerCards = PlayerCards Deck Stack Stack Stack Stack Stack Stack deriving (Show)
 data Player = Player PlayerInfo PlayerCards Action deriving (Show)
 
+-- TODO: figure out way to compare Actions (IE use '==' or '/=')
 data Action =   Idle |
                 Wait |
                 DrawThree |
@@ -109,7 +110,7 @@ createPlayer (name, cutVal) = Player pinfo pcards pact where --PlayerInfo(name c
     pcards = PlayerCards (map (setCardName name) (buildDeck 51)) [] [] [] [] [] []
     setCardName name card = Card (cardSuit card) (cardVal card) name
     buildDeck 0 = [Card 0 1 ""]
-    buildDeck d = buildDeck (d-1) ++ [Card (div d 13) (mod d 13 + 1) ""]
+    buildDeck d = buildDeck (d-1) ++ [Card (d `div` 13) (d `mod` 13 + 1) ""]
     pact = Wait    
 --Player name cutVal (map (setCardName name) (buildDeck 51)) [] [] [] where
 
@@ -129,11 +130,11 @@ shuffleNTimes n cutVal deck = shuffleNTimes (n-1) cutVal shuffledDeck where
 
 shuffle :: Int -> [Card] -> [Card]
 shuffle cutVal deck = shuffledDeck where
-    halfLen = div (length deck) 2 -- half-way index of deck
+    halfLen = length deck `div` 2 -- half-way index of deck
     sd1 = take halfLen deck -- 1st half of deck
     sd2 = drop halfLen deck -- 2nd half of deck
-    almostShuffledDeck = concat (zipWith (\a b -> [a, b]) sd1 sd2) -- interleave 2 halves
-    shuffledDeck = drop cutVal almostShuffledDeck ++ take cutVal almostShuffledDeck -- cut the deck at 'cutVal' index 
+    almostShuffledDeck = concat (zipWith (\a b -> [a, b]) sd1 sd2) -- interleave 2 halves (a0, b0, a1, b1, a2, b2, ...)
+    shuffledDeck = drop cutVal almostShuffledDeck ++ take cutVal almostShuffledDeck -- cut the deck at 'cutVal' index (otherwise 1st and last index don't change)
 
 
 -- Take a subset of cards from a stack of Cards. Start and End are inclusive    
@@ -167,22 +168,10 @@ getPlayerActions table = table' where
 
 getPlayerAction :: Player -> [Stack] -> Player
 getPlayerAction player midStacks = player' where
+    player' = Player pinfo pcards pact'
+
     pinfo = playerInfo player
     pcards = playerCards player
-
-    topNertz = head $ playerNertz pcards
-    topSolis = map head $ [playerSoli1 pcards] ++ [playerSoli2 pcards] ++ [playerSoli3 pcards] ++ [playerSoli4 pcards]
-    topHand = head $ playerHand pcards
-    topMids = map head midStacks
-    topCards = [topNertz] ++ [topHand] ++ topSolis
-
-    canAceToMid = foldr (((||) . (==1)) . cardVal) False topCards
-    canNertzToMid = any (canStackMid topNertz) topMids
-    canNertzToSoli = any (canStackSoli topNertz) topSolis
-    canHandToMid = any (canStackMid topHand) topMids
-    canSoliToMid = or $ getPerms topSolis topMids canStackMid
-    --canSoliToSoli
-
 
     pact' :: Action
     pact'
@@ -193,7 +182,25 @@ getPlayerAction player midStacks = player' where
         | canSoliToMid = SoliToMid 0 []
         | otherwise = DrawThree
 
-    player' = Player pinfo pcards pact'
+    canAceToMid = foldr (((||) . (==1)) . cardVal) False topCards
+    canNertzToMid = any (canStackMid topNertz) topMids
+    canNertzToSoli = any (canStackSoli topNertz) topSolis
+    canHandToMid = any (canStackMid topHand) topMids
+    canSoliToMid = or $ getPerms topSolis topMids canStackMid
+
+    topNertz = head $ playerNertz pcards
+    topSolis = map head $ [playerSoli1 pcards] ++ [playerSoli2 pcards] ++ [playerSoli3 pcards] ++ [playerSoli4 pcards]
+    topHand = head $ playerHand pcards
+    topMids = map head midStacks
+    topCards = [topNertz] ++ [topHand] ++ topSolis
+
+    
+    --canSoliToSoli
+
+
+    
+
+    
 
 
 {-
@@ -210,7 +217,7 @@ getPlayerAction player midStacks = player' where
 --canNertzToMid :: Stack -> Bool
 
 canStackOnMidStacks :: [Stack] -> Card -> Bool
-canStackOnMidStacks midStacks card = foldr (&&) True $ map (canStackOnMid card) midStacks
+canStackOnMidStacks midStacks card = foldr (&&) True $ map (canStackOnMid card) midStacks --TODO: is this correct implementation?
 
 
 canStackOnMid :: Card -> Stack -> Bool
@@ -240,7 +247,8 @@ playOneRound table = table' where
 nertzIsCalled :: Table -> Bool
 nertzIsCalled table = roundOver where
     pacts = map playerAction $ tablePlayers table
-    roundOver = NertzCalled `elem` pacts
+    roundOver = False
+    --roundOver = NertzCalled `elem` pacts
 
 
 --doPlayerAction :: ([Stack],[Player]) -> ([Stack],[Player])
@@ -284,16 +292,16 @@ doAceToMid player table = table' where
         | length hand /= length hand'   = PlayerCards deck nertz hand' soli1 soli2 soli3 soli4
         | otherwise = pcards
     
-    ace -- set ace's value
+    ace -- set correct source for ace
         | cardVal topNertz == 1 = topNertz
-        | cardVal topHand == 1  = topHand
         | cardVal topSoli1 == 1 = topSoli1
         | cardVal topSoli2 == 1 = topSoli2
         | cardVal topSoli3 == 1 = topSoli3
         | cardVal topSoli4 == 1 = topSoli4
+        | cardVal topHand == 1  = topHand
         | otherwise = Card (-1) (-1) "Huh?"
     
-    midStacks' = tableStacks table ++ [[ace]] -- Add ace to middle stacks
+    midStacks' = tableStacks table ++ [[ace]] -- Start new middle stack containing only an ace
 
 playerNames = ["Alf", "Bob", "Cat", "Dog"]
 playerCutVals = [10, 20, 30, 40]
