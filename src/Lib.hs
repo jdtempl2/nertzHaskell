@@ -54,7 +54,8 @@ data Action =   Idle |
                 HandToMid Stack |
                 HandToSoli Int |
                 SoliToSoli Int Int |
-                SoliToMid Int Stack deriving (Show)
+                SoliToMid Int Stack |
+                NertzCalled deriving (Show)
 
 --data PlayerAction = PlayerAction Action
 
@@ -176,10 +177,10 @@ getPlayerAction player midStacks = player' where
     topCards = [topNertz] ++ [topHand] ++ topSolis
 
     canAceToMid = foldr (((||) . (==1)) . cardVal) False topCards
-    canNertzToMid = foldr (||) False $ map (canStackMid topNertz) topMids
-    canNertzToSoli = foldr (||) False $ map (canStackSoli topNertz) topSolis
-    canHandToMid = foldr (||) False $ map (canStackMid topHand) topMids
-    canSoliToMid = foldr (||) False $ getPerms topSolis topMids canStackMid
+    canNertzToMid = any (canStackMid topNertz) topMids
+    canNertzToSoli = any (canStackSoli topNertz) topSolis
+    canHandToMid = any (canStackMid topHand) topMids
+    canSoliToMid = or $ getPerms topSolis topMids canStackMid
     --canSoliToSoli
 
 
@@ -218,6 +219,81 @@ canStackOnMid card stack = canStack where
     isAce = cardVal card == 1
     topCard = head stack
 
+
+
+doPlayerActions :: Table -> Table
+doPlayerActions table = table' where
+    players = tablePlayers table
+    midStacks = tableStacks table
+
+
+playOneTick :: Table -> Table
+playOneTick = doPlayerActions . getPlayerActions
+
+playOneRound :: Table -> Table
+playOneRound table = table' where
+    table' = if nertzIsCalled table then
+        table
+    else
+        playOneRound $ playOneTick table
+
+nertzIsCalled :: Table -> Bool
+nertzIsCalled table = roundOver where
+    pacts = map playerAction $ tablePlayers table
+    roundOver = NertzCalled `elem` pacts
+
+
+--doPlayerAction :: ([Stack],[Player]) -> ([Stack],[Player])
+--doPlayerAction (midStacks, (player:players)) = (midStacks',player') ++ 
+
+doAceToMid :: Player -> Table -> Table
+doAceToMid player table = table' where
+    table' = Table players' midStacks'
+
+    pcards = playerCards player
+    deck = playerDeck pcards
+    -- Check for ace in order: Nertz, Soli(s), Hand
+    [topNertz, topHand, topSoli1, topSoli2, topSoli3, topSoli4] = map head [nertz, hand, soli1, soli2, soli3, soli4]
+    [nertz, hand, soli1, soli2, soli3, soli4] = [playerNertz pcards, playerHand pcards, playerSoli1 pcards, playerSoli2 pcards, playerSoli3 pcards, playerSoli4 pcards]
+
+    nertz' = if cardVal topNertz == 1
+        then tail nertz
+        else nertz
+    hand' = if cardVal topHand == 1
+        then tail hand
+        else hand
+    soli1' = if cardVal topSoli1 == 1
+        then tail soli1
+        else soli1
+    soli2' = if cardVal topSoli2 == 1
+        then tail soli2
+        else soli2
+    soli3' = if cardVal topSoli3 == 1
+        then tail soli3
+        else soli3
+    soli4' = if cardVal topSoli4 == 1
+        then tail soli4
+        else soli4
+    
+    pcards' -- remove card from correct stack (listed in order of precedence)
+        | length nertz /= length nertz' = PlayerCards deck nertz' hand soli1 soli2 soli3 soli4
+        | length soli1 /= length soli1' = PlayerCards deck nertz hand soli1' soli2 soli3 soli4
+        | length soli2 /= length soli2' = PlayerCards deck nertz hand soli1 soli2' soli3 soli4
+        | length soli3 /= length soli3' = PlayerCards deck nertz hand soli1 soli2 soli3' soli4
+        | length soli4 /= length soli4' = PlayerCards deck nertz hand soli1 soli2 soli3 soli4'
+        | length hand /= length hand'   = PlayerCards deck nertz hand' soli1 soli2 soli3 soli4
+        | otherwise = pcards
+    
+    ace -- set ace's value
+        | cardVal topNertz == 1 = topNertz
+        | cardVal topHand == 1  = topHand
+        | cardVal topSoli1 == 1 = topSoli1
+        | cardVal topSoli2 == 1 = topSoli2
+        | cardVal topSoli3 == 1 = topSoli3
+        | cardVal topSoli4 == 1 = topSoli4
+        | otherwise = Card (-1) (-1) "Huh?"
+    
+    midStacks' = tableStacks table ++ [[ace]] -- Add ace to middle stacks
 
 playerNames = ["Alf", "Bob", "Cat", "Dog"]
 playerCutVals = [10, 20, 30, 40]
