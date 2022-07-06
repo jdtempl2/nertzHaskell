@@ -50,13 +50,13 @@ data Action =   Idle |
                 Wait |
                 DrawThree |
                 AceToMid |
-                NertzToMid Stack |
-                NertzToSoli Int |
-                HandToMid Stack |
-                HandToSoli Int |
-                SoliToSoli Int Int |
-                SoliToMid Int Stack |
-                NertzCalled deriving (Show)
+                NertzToMid |
+                NertzToSoli |
+                HandToMid |
+                HandToSoli |
+                SoliToSoli |
+                SoliToMid |
+                NertzCalled deriving (Show, Eq)
 
 --data PlayerAction = PlayerAction Action
 
@@ -176,10 +176,10 @@ getPlayerAction player midStacks = player' where
     pact' :: Action
     pact'
         | canAceToMid = AceToMid
-        | canNertzToMid = NertzToMid []
-        | canNertzToSoli = NertzToSoli 0
-        | canHandToMid = HandToMid []
-        | canSoliToMid = SoliToMid 0 []
+        | canNertzToMid = NertzToMid 
+        | canNertzToSoli = NertzToSoli 
+        | canHandToMid = HandToMid 
+        | canSoliToMid = SoliToMid 
         | otherwise = DrawThree
 
     canAceToMid = foldr (((||) . (==1)) . cardVal) False topCards
@@ -247,8 +247,7 @@ playOneRound table = table' where
 nertzIsCalled :: Table -> Bool
 nertzIsCalled table = roundOver where
     pacts = map playerAction $ tablePlayers table
-    roundOver = False
-    --roundOver = NertzCalled `elem` pacts
+    roundOver = NertzCalled `elem` pacts
 
 
 --doPlayerAction :: ([Stack],[Player]) -> ([Stack],[Player])
